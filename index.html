@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>象棋卜卦 - 雅緻翻卦體驗 (車/俥修正)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* ================================================= */
+        /* CSS: 基礎與全局美學定義 (與前一版本保持一致) */
+        /* ================================================= */
+        :root {
+            --color-primary: #5c677d; /* 深藍灰 (主色) */
+            --color-secondary: #a3b18a; /* 柔和綠 (輔色/背景) */
+            --color-red: #d64949; /* 典雅紅 */
+            --color-black: #2d3142; /* 沉穩黑 */
+            --color-background: #fdfdfd; /* 乾淨白 */
+            --color-border: #e0e0e0;
+            --font-serif: 'Noto Serif TC', serif; /* 典雅宋體 */
+        }
+
+        body { 
+            font-family: var(--font-serif);
+            background-color: var(--color-background); 
+            color: var(--color-primary); 
+            padding: 40px; 
+            text-align: center; 
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: #fff; 
+            padding: 40px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); /* 柔和陰影 */
+        }
+        h1 { 
+            font-family: var(--font-serif);
+            font-size: 2.2em;
+            color: var(--color-black); 
+            border-bottom: 2px solid var(--color-secondary); 
+            padding-bottom: 15px; 
+            margin-bottom: 30px; 
+        }
+        h2 { 
+            font-size: 1.4em; 
+            color: var(--color-primary); 
+            margin-bottom: 15px; 
+            font-weight: 700;
+        }
+        
+        /* 區塊樣式 */
+        #question-area { margin-bottom: 40px; }
+        #query { 
+            width: 80%; 
+            padding: 12px; 
+            margin-top: 10px; 
+            border-radius: 8px; 
+            border: 1px solid var(--color-border); 
+            box-sizing: border-box; 
+            resize: none; 
+            font-size: 1.1em;
+            transition: border-color 0.3s;
+        }
+        #query:focus { border-color: var(--color-secondary); outline: none; }
+
+        /* 選取區塊 */
+        #selection-area { margin-bottom: 40px; padding: 30px; border: 1px dashed var(--color-border); border-radius: 10px; }
+        #chess-pool { 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            margin-top: 20px; 
+            gap: 8px;
+        }
+
+        /* 棋子選取區的樣式 (蓋住的棋子) */
+        .covered-piece {
+            width: 50px;
+            height: 50px;
+            border: 2px solid var(--color-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%; 
+            font-size: 0; 
+            background-color: var(--color-secondary); /* 柔和綠色蓋住 */
+            transition: all 0.2s ease-in-out;
+        }
+        .covered-piece:hover { 
+            background-color: #bbc7a5; 
+            transform: scale(1.05); 
+        }
+        .covered-piece.selected {
+            opacity: 0; /* 選擇後隱藏，達到「翻開並移走」的潔淨感 */
+        }
+        #selection-prompt { font-size: 1em; color: var(--color-black); margin-top: 15px; }
+        #count { color: var(--color-red); font-weight: 700; }
+        
+        hr { border: 0; border-top: 1px solid var(--color-border); margin: 40px 0; }
+
+        /* ================================================= */
+        /* CSS: 卦局佈局 (視覺焦點) */
+        /* ================================================= */
+        #divination-layout-container {
+            margin-top: 50px;
+        }
+        #divination-layout {
+            position: relative;
+            width: 380px; 
+            height: 380px;
+            margin: 0 auto;
+        }
+        .piece-container {
+            width: 85px; 
+            height: 85px;
+            position: absolute;
+        }
+        
+        /* 十字定位 (微調間距，讓佈局更舒展) */
+        #pos-1 { top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; } 
+        #pos-4 { top: 8%; left: 50%; transform: translate(-50%, 0); } 
+        #pos-5 { bottom: 8%; left: 50%; transform: translate(-50%, 0); } 
+        #pos-2 { top: 50%; left: 8%; transform: translate(0, -50%); } 
+        #pos-3 { top: 50%; right: 8%; transform: translate(0, -50%); } 
+
+        /* ---- 棋子樣式 (模擬圓形外觀和紅黑顏色 - 精緻化) ---- */
+
+        .chess-piece {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%; 
+            background-color: var(--color-background); 
+            border: 3px solid var(--color-black); /* 外黑環 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 讓棋子有立體感 */
+        }
+        
+        /* 內層圓環與文字 */
+        .piece-inner-ring {
+            width: 70%; 
+            height: 70%;
+            border-radius: 50%;
+            border: 3px solid; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.4em; /* 棋子文字放大，突顯 */
+            font-weight: 700;
+        }
+
+        /* 紅黑棋子顏色設定 */
+        .red-piece .piece-inner-ring {
+            color: var(--color-red); /* 文字典雅紅 */
+            border-color: var(--color-red); /* 內環典雅紅 */
+        }
+        .black-piece .piece-inner-ring {
+            color: var(--color-black); /* 文字沉穩黑 */
+            border-color: var(--color-black); /* 內環沉穩黑 */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>☯️ 象棋卜卦 - 緣起一念 局定五位</h1>
+
+    <div id="question-area">
+        <label for="query" style="display: block; margin-bottom: 8px; font-weight: 700;">🔮 請您靜心誠意，輸入所問之事：</label>
+        <textarea id="query" rows="4" cols="50" placeholder="問題請盡量明確，以利占卜，例如：我接下來三個月的事業發展會如何？"></textarea>
+    </div>
+
+    <div id="selection-area">
+        <h2>✨ 第二步：抽取天機 - 依序點選 5 顆象棋</h2>
+        <div id="chess-pool">
+            </div>
+        <p id="selection-prompt">已選取： <span id="count">0</span> / 5 顆</p>
+    </div>
+
+    <hr>
+
+    <div id="divination-layout-container">
+        <h2>📜 第三步：卦局呈現 - 五位定盤</h2>
+        <div id="divination-layout">
+            <div id="pos-4" class="piece-container top"></div>
+            <div id="pos-2" class="piece-container left"></div>
+            <div id="pos-1" class="piece-container center"></div>
+            <div id="pos-3" class="piece-container right"></div>
+            <div id="pos-5" class="piece-container bottom"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 核心數據定義
+    const ALL_CHESS_PIECES = [
+        { name: '帥', color: '紅' }, { name: '將', color: '黑' },
+        { name: '仕', color: '紅' }, { name: '士', color: '黑' },
+        { name: '仕', color: '紅' }, { name: '士', color: '黑' },
+        { name: '相', color: '紅' }, { name: '象', color: '黑' },
+        { name: '相', color: '紅' }, { name: '象', color: '黑' },
+        
+        // 修正點：俥 是紅色，車 是黑色
+        { name: '俥', color: '紅' }, { name: '車', color: '黑' },
+        { name: '俥', color: '紅' }, { name: '車', color: '黑' },
+        
+        { name: '傌', color: '紅' }, { name: '馬', color: '黑' },
+        { name: '傌', color: '紅' }, { name: '馬', color: '黑' },
+        { name: '炮', color: '紅' }, { name: '包', color: '黑' },
+        { name: '炮', color: '紅' }, { name: '包', color: '黑' },
+        { name: '兵', color: '紅' }, { name: '卒', color: '黑' },
+        { name: '兵', color: '紅' }, { name: '卒', color: '黑' },
+        { name: '兵', color: '紅' }, { name: '卒', color: '黑' },
+        { name: '兵', color: '紅' }, { name: '卒', color: '黑' },
+        { name: '兵', color: '紅' }, { name: '卒', color: '黑' }
+    ];
+
+    let selectedPieces = [];
+
+    // 定義五個位置的 ID 及其對應的順序
+    const POSITION_MAP = {
+        1: 'pos-1', // 中間 (問卦者自己)
+        2: 'pos-2', // 左邊 (女性平輩)
+        3: 'pos-3', // 右邊 (男性平輩)
+        4: 'pos-4', // 上面 (長輩/上司)
+        5: 'pos-5'  // 下面 (晚輩/下屬)
+    };
+    
+    // =================================================================
+    // JavaScript 邏輯 (功能保持不變)
+    // =================================================================
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        let piecesToSelect = shuffleArray(ALL_CHESS_PIECES.map((piece, index) => ({ ...piece, id: index })));
+        
+        const chessPool = document.getElementById('chess-pool');
+        piecesToSelect.forEach(piece => {
+            const div = document.createElement('div');
+            div.className = 'covered-piece';
+            div.dataset.id = piece.id;
+            // 點擊事件：如果問題有效，則執行選取
+            div.onclick = () => {
+                 const query = document.getElementById('query').value.trim();
+                 if (query.length < 5) {
+                     alert("請先輸入一個明確的問題 (至少 5 個字)！");
+                     return;
+                 }
+                 selectPiece(piece, div);
+            };
+            chessPool.appendChild(div);
+        });
+    });
+
+    // 陣列洗牌函式
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // 處理棋子選取的核心邏輯
+    function selectPiece(pieceData, element) {
+        if (selectedPieces.length >= 5) {
+            return;
+        }
+
+        selectedPieces.push(pieceData);
+        const sequenceNumber = selectedPieces.length;
+
+        drawPieceOnLayout(pieceData, sequenceNumber);
+        
+        document.getElementById('count').textContent = sequenceNumber;
+        
+        element.classList.add('selected');
+        
+        if (sequenceNumber === 5) {
+            setTimeout(() => {
+                alert("五顆象棋已選取完畢，卦局已定。請參照卦象進行解析！");
+            }, 300);
+        }
+    }
+
+    // 創建帶有內環的棋子圖像元素
+    function createPieceElement(pieceData) {
+        const pieceElement = document.createElement('div');
+        const colorClass = (pieceData.color === '紅') ? 'red-piece' : 'black-piece';
+        
+        pieceElement.className = `chess-piece ${colorClass}`;
+
+        const innerRing = document.createElement('div');
+        innerRing.className = 'piece-inner-ring';
+        innerRing.textContent = pieceData.name;
+
+        pieceElement.appendChild(innerRing);
+        return pieceElement;
+    }
+
+    // 繪製棋子到十字形佈局中
+    function drawPieceOnLayout(pieceData, sequenceNumber) {
+        const containerId = POSITION_MAP[sequenceNumber];
+        const container = document.getElementById(containerId);
+        
+        const pieceElement = createPieceElement(pieceData);
+
+        container.innerHTML = '';
+        container.appendChild(pieceElement);
+    }
+</script>
+</body>
+</html>
